@@ -57,3 +57,4 @@ ROS Scripting covers the following aspects in this submission:
 * Spawning the Gazebo, MoveIt!, RViz setups together through a ROSLaunch file;
 * Handling the UR5 node, the primary node used to control the UR5 used in this task; and
 * Handling TF data from the logical camera and feeding the corresponding actions to the UR5.
+# MTE-LAB-CLONE
