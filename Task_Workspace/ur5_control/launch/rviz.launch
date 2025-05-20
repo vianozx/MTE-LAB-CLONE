@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    Launch file for only the UR5 robot in RViz and Gazebo.
+ -->
+<launch>
+    <!-- Add Models PATH for Gazebo -->
+    <env name="GAZEBO_MODEL_PATH" value="$(find env_sim)/models"/>
+    <env name="RVIZ_MODEL_PATH" value="$(find env_sim)/models"/>
+
+    <!-- Launch Gazebo with Empty World -->
+    <include file="$(find env_sim)/launch/gazebo_empty_world.launch">
+        <arg name="debug" value="false" />
+        <arg name="gui" value="true" />
+        <arg name="paused" value="false"/>
+        <arg name="use_sim_time" value="true"/>
+        <arg name="headless" value="false"/>
+    </include>
+
+    <!-- Spawn UR5 -->
+    <include file="$(find env_sim)/launch/gazebo_ur5_spawn.launch">
+        <arg name="arg_x" value="0.00" />
+        <arg name="arg_y" value="0.00" />
+        <arg name="arg_z" value="0.00" />
+        <arg name="arg_R" value="0.0" />
+        <arg name="arg_P" value="0.0" />
+        <arg name="arg_Y" value="0.0" />
+    </include>
+
+    <!-- Launch MoveIt move_group Node -->
+    <include file="$(find pkg_moveit_ur5_1)/launch/move_group.launch" /> 
+
+    <!-- Run RViz with MoveIt Plugin -->
+    <arg name="use_rviz" default="true" />
+    <include file="$(find pkg_moveit_ur5_1)/launch/moveit_rviz.launch" if="$(arg use_rviz)">
+        <arg name="rviz_config" value="$(find pkg_moveit_ur5_1)/launch/moveit.rviz"/>
+    </include>
+</launch>

@@ -176,7 +176,28 @@ class UR5MoveIt:
             box_name (str): The name of the box to be removed.
         '''
         self._scene.remove_world_object(box_name)
+        
+    def go_to_joint_angles_plan_only(self, joint_angles):
+        """Plan to joint angles but don't execute, return planning data"""
+        # Set start time
+        start_time = rospy.get_time()
+    
+        # Plan to position
+        plan = self.moveit_commander.move_group.plan(joint_angles)
+        
+        # Calculate planning time
+        planning_time = rospy.get_time() - start_time
+        
+        # Check if plan was successful
+        if plan[0]:  # ROS Melodic returns (success, trajectory_msg)
+            return True, plan[1], planning_time, None
+        else:
+            return False, None, planning_time, None
 
+    def go_to_joint_angles_execute_plan(self, plan):
+        """Execute a pre-computed plan"""
+        return self.moveit_commander.move_group.execute(plan, wait=True)
+    
     def __del__(self):
         '''
         Destructor for the class object.
