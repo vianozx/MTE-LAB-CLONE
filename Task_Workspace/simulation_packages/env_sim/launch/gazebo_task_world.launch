@@ -15,7 +15,7 @@
 
     <!-- Gazebo with World File -->
     <include file="$(find env_sim)/launch/gazebo_empty_world.launch">
-        <arg name="world_name" value="$(find env_sim)/worlds/gazebo_task.world"/>
+        <arg name="world_name" value="$(find env_sim)/worlds/gazebo_task_copy.world"/>
         <arg name="debug" value="$(arg debug)" />
         <arg name="gui" value="$(arg gui)" />
         <arg name="paused" value="$(arg paused)"/>

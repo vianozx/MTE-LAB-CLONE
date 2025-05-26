@@ -20,7 +20,8 @@
   <rosparam file ="$(find env_sim)/config/ur5/gazebo_controllers_ur5_1.yaml"/>
     
   <node name= "controller_spawner" pkg= "controller_manager" type="spawner" args="ur5_1_controller"/>
-
+      <!-- Visualization in Rviz-->
+    <!-- <node name="rviz" pkg="rviz" type="rviz" args= "-d $(find env_sim)/config/rviz/ur5_1.rviz" /> -->
   <!-- Robot State Publisher for TF of each joint: publishes all the current states of the joint, then RViz can visualize -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
   
