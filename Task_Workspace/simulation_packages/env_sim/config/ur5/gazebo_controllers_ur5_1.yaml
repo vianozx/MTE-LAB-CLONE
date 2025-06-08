@@ -1,3 +1,17 @@
 ur5_1_controller:
     type: "position_controllers/JointTrajectoryController"
     joints: [ur5_shoulder_pan_joint, ur5_shoulder_lift_joint, ur5_elbow_joint, ur5_wrist_1_joint, ur5_wrist_2_joint, ur5_wrist_3_joint]
+constraints:
+        goal_time: 5.0  # Maximum time to reach goal (seconds)
+        ur5_shoulder_pan_joint:
+            goal: 0.01  # Position tolerance in radians (~0.57 degrees)
+        ur5_shoulder_lift_joint:
+            goal: 0.01  # This joint was causing the error with 0.000022 rad
+        ur5_elbow_joint:
+            goal: 0.01
+        ur5_wrist_1_joint:
+            goal: 0.01
+        ur5_wrist_2_joint:
+            goal: 0.01
+        ur5_wrist_3_joint:
+            goal: 0.01

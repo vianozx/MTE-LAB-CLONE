@@ -10,7 +10,6 @@
     <node name="rviz" pkg="rviz" type="rviz" args= "-d $(find env_sim)/config/rviz/ur5_1.rviz" />
 
     <!-- Visualization of the use_gui for playing with joint-->
-    
     <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"  />
     
     

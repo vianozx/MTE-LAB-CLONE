@@ -53,6 +53,13 @@ class UR5MoveIt:
         self._touch_links = self._robot.get_link_names(
             group=self._planning_group)
 
+        # Set tolerances to handle small errors
+        self._group.set_goal_position_tolerance(0.01)  # 1cm tolerance
+        self._group.set_goal_orientation_tolerance(0.01)  # ~0.6 degree tolerance
+        self._group.set_goal_joint_tolerance(0.01)  # 0.01 radian tolerance
+        self._group.set_planning_time(10.0)
+        self._group.set_num_planning_attempts(10)
+
         rospy.loginfo(
             '\033[94m' + "Planning Group: {}".format(self._planning_frame) + '\033[0m')
         rospy.loginfo(
@@ -61,6 +68,26 @@ class UR5MoveIt:
             '\033[94m' + "Group Names: {}".format(self._group_names) + '\033[0m')
 
         rospy.loginfo('\033[94m' + " >>> Ur5Moveit init done." + '\033[0m')
+
+    def check_joint_tolerance(self, target_joints, tolerance=0.05):
+        """
+        Check if current joint positions are within tolerance of target.
+        
+        Parameters:
+            target_joints (list): Target joint angles
+            tolerance (float): Acceptable tolerance in radians
+            
+        Returns:
+            bool: True if within tolerance
+        """
+        current_joints = self._group.get_current_joint_values()
+        
+        for i, (current, target) in enumerate(zip(current_joints, target_joints)):
+            error = abs(current - target)
+            if error > tolerance:
+                rospy.logwarn(f"Joint {i} error: {error:.6f} rad (tolerance: {tolerance})")
+                return False
+        return True
 
     def go_to_pose(self, arg_pose):
         '''
