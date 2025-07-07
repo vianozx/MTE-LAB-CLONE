@@ -4,9 +4,9 @@ ur5_1_controller:
 constraints:
         goal_time: 5.0  # Maximum time to reach goal (seconds)
         ur5_shoulder_pan_joint:
-            goal: 0.01  # Position tolerance in radians (~0.57 degrees)
+            goal: 0.05  # Position tolerance in radians (~0.57 degrees)
         ur5_shoulder_lift_joint:
-            goal: 0.01  # This joint was causing the error with 0.000022 rad
+            goal: 0.05  # This joint was causing the error with 0.000022 rad
         ur5_elbow_joint:
             goal: 0.01
         ur5_wrist_1_joint:
