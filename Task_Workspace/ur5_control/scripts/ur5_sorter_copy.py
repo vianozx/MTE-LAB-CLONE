@@ -25,9 +25,205 @@ operation_times = []
 memory_usage = []
 planner_usage = {}  # Track which planners are being used
 user_selected_planner = None  # Store the user's planner choice for the entire session
+path_lengths = []  # Store Cartesian path lengths
+joint_path_lengths = []  # Store joint space path lengths
+previous_pose = None  # Store previous end-effector pose
+previous_joint_angles = None  # Store previous joint angles
+
+
+def calculate_cartesian_distance(pose1, pose2):
+    """
+    Calculate Cartesian distance between two poses.
+    
+    Parameters:
+        pose1: geometry_msgs/Pose or PoseStamped
+        pose2: geometry_msgs/Pose or PoseStamped
+    
+    Returns:
+        float: Cartesian distance in meters
+    """
+    import math
+    
+    # Extract position from pose (handle both Pose and PoseStamped)
+    if hasattr(pose1, 'pose'):
+        pos1 = pose1.pose.position
+    else:
+        pos1 = pose1.position
+        
+    if hasattr(pose2, 'pose'):
+        pos2 = pose2.pose.position
+    else:
+        pos2 = pose2.position
+    
+    # Calculate Euclidean distance
+    dx = pos2.x - pos1.x
+    dy = pos2.y - pos1.y
+    dz = pos2.z - pos1.z
+    
+    distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+    return distance
+
+
+def calculate_joint_space_distance(joints1, joints2):
+    """
+    Calculate joint space distance between two joint configurations.
+    
+    Parameters:
+        joints1: list of joint angles
+        joints2: list of joint angles
+    
+    Returns:
+        float: Joint space distance in radians
+    """
+    import math
+    
+    if len(joints1) != len(joints2):
+        return 0.0
+    
+    # Calculate Euclidean distance in joint space
+    distance = 0.0
+    for j1, j2 in zip(joints1, joints2):
+        distance += (j2 - j1) ** 2
+    
+    return math.sqrt(distance)
+
+
+def get_current_pose():
+    """
+    Get current end-effector pose from the robot.
+    
+    Returns:
+        geometry_msgs/Pose: Current end-effector pose
+    """
+    try:
+        if hasattr(ur5, '_group') and ur5._group is not None:
+            current_pose = ur5._group.get_current_pose().pose
+        elif hasattr(ur5, 'group') and ur5.group is not None:
+            current_pose = ur5.group.get_current_pose().pose
+        else:
+            return None
+        return current_pose
+    except Exception as e:
+        rospy.logwarn(f"Could not get current pose: {e}")
+        return None
+
+
+def get_current_joint_angles():
+    """
+    Get current joint angles from the robot.
+    
+    Returns:
+        list: Current joint angles
+    """
+    try:
+        if hasattr(ur5, '_group') and ur5._group is not None:
+            current_joints = ur5._group.get_current_joint_values()
+        elif hasattr(ur5, 'group') and ur5.group is not None:
+            current_joints = ur5.group.get_current_joint_values()
+        else:
+            return None
+        return current_joints
+    except Exception as e:
+        rospy.logwarn(f"Could not get current joint angles: {e}")
+        return None
+
+
+def track_path_lengths(operation_type):
+    """
+    Track and log path lengths for the current motion.
+    
+    Parameters:
+        operation_type (str): Type of operation for logging
+    """
+    global previous_pose, previous_joint_angles, path_lengths, joint_path_lengths
+    
+    current_pose = get_current_pose()
+    current_joints = get_current_joint_angles()
+    
+    if current_pose is None or current_joints is None:
+        rospy.logwarn("Could not get current robot state for path tracking")
+        return
+    
+    if previous_pose is not None and previous_joint_angles is not None:
+        # Calculate Cartesian path length
+        cartesian_distance = calculate_cartesian_distance(previous_pose, current_pose)
+        path_lengths.append(cartesian_distance)
+        
+        # Calculate joint space path length
+        joint_distance = calculate_joint_space_distance(previous_joint_angles, current_joints)
+        joint_path_lengths.append(joint_distance)
+        
+        rospy.loginfo('\033[98m' + f"[PATH] {operation_type} - Cartesian: {cartesian_distance:.4f}m, Joint Space: {joint_distance:.4f}rad" + '\033[0m')
+    else:
+        rospy.loginfo('\033[98m' + f"[PATH] {operation_type} - Starting position recorded" + '\033[0m')
+    
+    # Update previous positions
+    previous_pose = current_pose
+    previous_joint_angles = current_joints
 
 
 def print_performance_stats():
+    """
+    Print current memory usage and performance statistics.
+    """
+    process = psutil.Process(os.getpid())
+    memory_info = process.memory_info()
+    memory_mb = memory_info.rss / 1024 / 1024  # Convert to MB
+    cpu_percent = process.cpu_percent()
+    
+    rospy.loginfo('\033[96m' + "=" * 70 + '\033[0m')
+    rospy.loginfo('\033[96m' + f"Memory Usage: {memory_mb:.2f} MB" + '\033[0m')
+    rospy.loginfo('\033[96m' + f"Virtual Memory: {memory_info.vms / 1024 / 1024:.2f} MB" + '\033[0m')
+    rospy.loginfo('\033[96m' + f"CPU Usage: {cpu_percent:.1f}%" + '\033[0m')
+    
+    if operation_times:
+        avg_time = sum(operation_times) / len(operation_times)
+        rospy.loginfo('\033[96m' + f"Average Operation Time: {avg_time:.3f} seconds" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"Total Operations: {len(operation_times)}" + '\033[0m')
+    
+    if memory_usage:
+        max_memory = max(memory_usage)
+        min_memory = min(memory_usage)
+        rospy.loginfo('\033[96m' + f"Peak Memory: {max_memory:.2f} MB" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"Min Memory: {min_memory:.2f} MB" + '\033[0m')
+    
+    # Print path length statistics
+    if path_lengths:
+        total_cartesian = sum(path_lengths)
+        avg_cartesian = total_cartesian / len(path_lengths)
+        max_cartesian = max(path_lengths)
+        min_cartesian = min(path_lengths)
+        
+        rospy.loginfo('\033[96m' + "Path Length Statistics (Cartesian):" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Total Distance: {total_cartesian:.4f} m" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Average per Motion: {avg_cartesian:.4f} m" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Max Single Motion: {max_cartesian:.4f} m" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Min Single Motion: {min_cartesian:.4f} m" + '\033[0m')
+    
+    if joint_path_lengths:
+        total_joint = sum(joint_path_lengths)
+        avg_joint = total_joint / len(joint_path_lengths)
+        max_joint = max(joint_path_lengths)
+        min_joint = min(joint_path_lengths)
+        
+        rospy.loginfo('\033[96m' + "Path Length Statistics (Joint Space):" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Total Distance: {total_joint:.4f} rad" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Average per Motion: {avg_joint:.4f} rad" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Max Single Motion: {max_joint:.4f} rad" + '\033[0m')
+        rospy.loginfo('\033[96m' + f"  Min Single Motion: {min_joint:.4f} rad" + '\033[0m')
+    
+    # Print planner usage statistics
+    if planner_usage:
+        rospy.loginfo('\033[96m' + "Motion Planning Algorithm Usage:" + '\033[0m')
+        total_plans = sum(planner_usage.values())
+        for planner, count in sorted(planner_usage.items(), key=lambda x: x[1], reverse=True):
+            percentage = (count / total_plans) * 100
+            rospy.loginfo('\033[96m' + f"  {planner}: {count} times ({percentage:.1f}%)" + '\033[0m')
+    
+    rospy.loginfo('\033[96m' + "=" * 70 + '\033[0m')
+    
+    # Store current memory usage
+    memory_usage.append(memory_mb)
     """
     Print current memory usage and performance statistics.
     """
@@ -542,6 +738,9 @@ def box_plan(box_name, box_length, vacuum_gripper_width):
             selected_planner = use_session_planner("Red Box Pick")
             success = ur5.go_to_pose(box_pose)
             
+            # Track path lengths after motion
+            track_path_lengths("Red Box Pick")
+            
             # Log what planner was actually used after the motion
             actual_planner = log_planner_usage_after_motion("Red Box Pick")
             
@@ -575,6 +774,9 @@ def box_plan(box_name, box_length, vacuum_gripper_width):
             selected_planner = use_session_planner("Green Box Pick")
             success = ur5.go_to_pose(box_pose)
             
+            # Track path lengths after motion
+            track_path_lengths("Green Box Pick")
+            
             # Log what planner was actually used after the motion
             actual_planner = log_planner_usage_after_motion("Green Box Pick")
             
@@ -604,6 +806,9 @@ def box_plan(box_name, box_length, vacuum_gripper_width):
             # Use the session planner selected at startup
             selected_planner = use_session_planner("Blue Box Pick")
             success = ur5.go_to_pose(box_pose)
+            
+            # Track path lengths after motion
+            track_path_lengths("Blue Box Pick")
             
             # Log what planner was actually used after the motion
             actual_planner = log_planner_usage_after_motion("Blue Box Pick")
@@ -638,6 +843,9 @@ def bin_plan(box_name, bin_name, bin_joint_angles):
         selected_planner = use_session_planner("Red Bin Place")
         success = ur5.set_joint_angles(bin_joint_angles)
         
+        # Track path lengths after motion
+        track_path_lengths("Red Bin Place")
+        
         # Log what planner was actually used after the motion
         actual_planner = log_planner_usage_after_motion("Red Bin Place")
         
@@ -657,6 +865,9 @@ def bin_plan(box_name, bin_name, bin_joint_angles):
         selected_planner = use_session_planner("Green Bin Place")
         success = ur5.set_joint_angles(bin_joint_angles)
         
+        # Track path lengths after motion
+        track_path_lengths("Green Bin Place")
+        
         # Log what planner was actually used after the motion
         actual_planner = log_planner_usage_after_motion("Green Bin Place")
         
@@ -672,6 +883,9 @@ def bin_plan(box_name, bin_name, bin_joint_angles):
     elif(bin_name == 'B'):  # Blue bin
         selected_planner = use_session_planner("Blue Bin Place")
         success = ur5.set_joint_angles(bin_joint_angles)
+        
+        # Track path lengths after motion
+        track_path_lengths("Blue Bin Place")
         
         # Log what planner was actually used after the motion
         actual_planner = log_planner_usage_after_motion("Blue Bin Place")
@@ -722,6 +936,9 @@ def controller():
     
     selected_planner = use_session_planner("Home Position")
     success = ur5.set_joint_angles(joint_angles[0])
+    
+    # Track path lengths after motion (initial setup)
+    track_path_lengths("Home Position")
     
     # Log what planner was actually used after the motion
     actual_planner = log_planner_usage_after_motion("Home Position")
@@ -795,6 +1012,9 @@ def controller():
         selected_planner = use_session_planner("Return Home")
         success = ur5.set_joint_angles(joint_angles[0])
         
+        # Track path lengths after motion
+        track_path_lengths("Return Home")
+        
         # Log what planner was actually used after the motion
         actual_planner = log_planner_usage_after_motion("Return Home")
         
@@ -848,3 +1068,12 @@ if __name__ == "__main__":
             for planner, count in sorted(planner_usage.items(), key=lambda x: x[1], reverse=True):
                 percentage = (count / total_plans) * 100
                 rospy.loginfo('\033[95m' + f"  {planner}: {count} times ({percentage:.1f}%)" + '\033[0m')
+                
+        # Print final path length summary
+        if path_lengths:
+            total_cartesian = sum(path_lengths)
+            rospy.loginfo('\033[95m' + f"Total Cartesian Distance Traveled: {total_cartesian:.4f} meters" + '\033[0m')
+            
+        if joint_path_lengths:
+            total_joint = sum(joint_path_lengths)
+            rospy.loginfo('\033[95m' + f"Total Joint Space Distance Traveled: {total_joint:.4f} radians" + '\033[0m')
